@@ -9,8 +9,9 @@ class StarCitizenAttrPlugin(Star):
         logger.info("✅ 超时空星舰插件加载成功！")
 
     @filter.command("超时空星舰菜单")
-    async def menu_handler(self, event: AstrMessageEvent, *args, **kwargs):
+    async def menu_handler(self, *args, **kwargs):
         """显示超时空星舰功能菜单"""
+        event = args[0]  # 不管传多少参数，第一个永远是 event
         logger.info("收到 /超时空星舰菜单 指令！")
         menu_content = """📋 超时空星舰 功能菜单
 ------------------------
@@ -19,11 +20,12 @@ class StarCitizenAttrPlugin(Star):
 ------------------------
 发送指令即可使用对应功能~
 """
-        await event.send(menu_content)
+        yield event.plain_result(menu_content)
 
     @filter.command("装备属性")
-    async def equip_attr_handler(self, event: AstrMessageEvent, *args, **kwargs):
+    async def equip_attr_handler(self, *args, **kwargs):
         """查看完整装备属性表"""
+        event = args[0]  # 不管传多少参数，第一个永远是 event
         logger.info("收到 /装备属性 指令！")
         attr_content = """📊 超时空星舰 装备属性数值对比表
 ------------------------
@@ -37,4 +39,4 @@ HP: 3.0 | 攻击: 0.7 | 能力: 15.7
 火抗: 63.7 | 耐力: 26 | 武器: 6.7
 科技: 9.7 | 导航: 10.5 | 引擎: 9.0 | 维修: 0.7
 """
-        await event.send(attr_content)
+        yield event.plain_result(attr_content)
