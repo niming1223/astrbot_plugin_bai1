@@ -24,6 +24,8 @@ class StarCitizenAttrPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         logger.info("✅ 超时空星舰插件加载成功！")
+        # 插件自己的目录，保证有权限
+        self.plugin_dir = os.path.dirname(__file__)
 
     def generate_attr_image(self):
         """生成装备属性表格图片"""
@@ -39,23 +41,8 @@ class StarCitizenAttrPlugin(Star):
         image = Image.new('RGB', (img_width, img_height), color='white')
         draw = ImageDraw.Draw(image)
         
-        # 加载字体（支持中文）
-        try:
-            # 尝试加载系统中文字体
-            font_paths = [
-                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-                "simhei.ttf"
-            ]
-            font = None
-            for path in font_paths:
-                if os.path.exists(path):
-                    font = ImageFont.truetype(path, 20)
-                    break
-            if font is None:
-                font = ImageFont.load_default()
-        except:
-            font = ImageFont.load_default()
+        # 加载文泉驿字体，刚安装的，肯定有
+        font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 20)
         
         # 绘制表格边框
         for i in range(rows + 1):
@@ -67,7 +54,7 @@ class StarCitizenAttrPlugin(Star):
         for i in range(rows):
             for j in range(cols):
                 text = TABLE_DATA[i][j]
-                # 用 textbbox 代替 textsize，兼容新版本 PIL
+                # 用 textbbox 计算文字大小
                 bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
@@ -76,8 +63,8 @@ class StarCitizenAttrPlugin(Star):
                 y = i*cell_height + (cell_height - text_height)/2
                 draw.text((x, y), text, fill='black', font=font)
         
-        # 保存图片
-        img_path = "/tmp/equip_attr.png"
+        # 保存到插件目录，绝对有权限
+        img_path = os.path.join(self.plugin_dir, "equip_attr.png")
         image.save(img_path)
         return img_path
 
