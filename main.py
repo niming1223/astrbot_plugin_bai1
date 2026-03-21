@@ -8,7 +8,6 @@ class StarCitizenAttrPlugin(Star):
         super().__init__(context)
         logger.info("✅ 超时空星舰插件加载成功！")
 
-    # 完全用官方格式，和极简版的 /test 一样
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         """显示超时空星舰功能菜单"""
@@ -22,21 +21,23 @@ class StarCitizenAttrPlugin(Star):
 """
         yield event.plain_result(menu_content)
 
-    # 同样的格式
     @filter.command("装备属性")
     async def 装备属性(self, event: AstrMessageEvent):
         """查看完整装备属性表"""
         logger.info("收到 /装备属性 指令！")
-        attr_content = """📊 超时空星舰 装备属性数值对比表
-------------------------
-【橙装】
-HP: 3.0 | 攻击: 0.7 | 能力: 15.7
-火抗: 63.7 | 耐力: 22 | 武器: 6.7
-科技: 9.7 | 导航: 10.5 | 引擎: 7.5 | 维修: 0.6
-------------------------
-【金装】
-HP: 3.0 | 攻击: 0.7 | 能力: 15.7
-火抗: 63.7 | 耐力: 26 | 武器: 6.7
-科技: 9.7 | 导航: 10.5 | 引擎: 9.0 | 维修: 0.7
+        # 完全按照你图片里的表格格式
+        attr_content = """📊 装备属性数值对比表
+| 装备属性 | 英语 | 橙装 | 金装 |
+| -------- | -------- | -------- | -------- |
+| HP | HP | 3.0 | 3.0 |
+| 攻击 | Attack | 0.7 | 0.7 |
+| 能力 | Ability | 15.7 | 15.7 |
+| 火抗 | FireResistance | 63.7 | 63.7 |
+| 耐力 | Stamina | 22 | 26 |
+| 武器 | Weapon | 6.7 | 6.7 |
+| 科技 | Sciece | 9.7 | 9.7 |
+| 导航 | Pilot | 10.5 | 10.5 |
+| 引擎 | Engine | 7.5 | 9 |
+| 维修 | Repair | 0.6 | 0.7 |
 """
         yield event.plain_result(attr_content)
