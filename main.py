@@ -41,13 +41,23 @@ class StarCitizenAttrPlugin(Star):
         
         # 加载字体（支持中文）
         try:
-            # 尝试加载系统字体
-            font = ImageFont.truetype("simhei.ttf", 20)
+            # 尝试加载系统中文字体
+            font_paths = [
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                "simhei.ttf"
+            ]
+            font = None
+            for path in font_paths:
+                if os.path.exists(path):
+                    font = ImageFont.truetype(path, 20)
+                    break
+            if font is None:
+                font = ImageFont.load_default()
         except:
-            # 如果没有，用默认字体
             font = ImageFont.load_default()
         
-        # 绘制表格
+        # 绘制表格边框
         for i in range(rows + 1):
             draw.line([(0, i*cell_height), (img_width, i*cell_height)], fill='black', width=2)
         for j in range(cols + 1):
@@ -57,8 +67,11 @@ class StarCitizenAttrPlugin(Star):
         for i in range(rows):
             for j in range(cols):
                 text = TABLE_DATA[i][j]
+                # 用 textbbox 代替 textsize，兼容新版本 PIL
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
                 # 居中文字
-                text_width, text_height = draw.textsize(text, font=font)
                 x = j*cell_width + (cell_width - text_width)/2
                 y = i*cell_height + (cell_height - text_height)/2
                 draw.text((x, y), text, fill='black', font=font)
@@ -92,4 +105,19 @@ class StarCitizenAttrPlugin(Star):
             yield event.image_result(img_path)
         except Exception as e:
             logger.error(f"生成图片失败: {e}")
-            yield event.plain_result("生成图片失败， fallback 到文字版：\n| 装备属性 | 英语 | 橙装 | 金装 |\n| -------- | -------- | -------- | -------- |\n| HP | HP | 3.0 | 3.0 |\n| 攻击 | Attack | 0.7 | 0.7 |\n| 能力 | Ability | 15.7 | 15.7 |\n| 火抗 | FireResistance | 63.7 | 63.7 |\n| 耐力 | Stamina | 22 | 26 |\n| 武器 | Weapon | 6.7 | 6.7 |\n| 科技 | Sciece | 9.7 | 9.7 |\n| 导航 | Pilot | 10.5 | 10.5 |\n| 引擎 | Engine | 7.5 | 9 |\n| 维修 | Repair | 0.6 | 0.7 |")
+            # fallback 到文字版
+            fallback_text = """生成图片失败， fallback 到文字版：
+| 装备属性 | 英语 | 橙装 | 金装 |
+| -------- | -------- | -------- | -------- |
+| HP | HP | 3.0 | 3.0 |
+| 攻击 | Attack | 0.7 | 0.7 |
+| 能力 | Ability | 15.7 | 15.7 |
+| 火抗 | FireResistance | 63.7 | 63.7 |
+| 耐力 | Stamina | 22 | 26 |
+| 武器 | Weapon | 6.7 | 6.7 |
+| 科技 | Sciece | 9.7 | 9.7 |
+| 导航 | Pilot | 10.5 | 10.5 |
+| 引擎 | Engine | 7.5 | 9 |
+| 维修 | Repair | 0.6 | 0.7 |
+"""
+            yield event.plain_result(fallback_text)
