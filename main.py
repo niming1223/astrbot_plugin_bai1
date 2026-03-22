@@ -59,6 +59,13 @@ ATTRS = [
     {"name": "耐力", "key": "endurance"}
 ]
 
+# 【新增】策略名称映射（英文→中文）
+STRATEGY_MAP = {
+    "base": "基础方案",
+    "priorFour": "优先四级药方案",
+    "saveFive": "最省五级药方案"
+}
+
 # 装备属性表格数据
 TABLE_DATA = [
     ["装备属性", "英语", "橙装", "金装"],
@@ -94,32 +101,22 @@ class StarCitizenAttrPlugin(Star):
         if not os.path.exists(self.plugin_dir):
             os.makedirs(self.plugin_dir)
 
-    # ===================== 【核心修复】100%兼容获取指令参数 =====================
+    # ===================== 100%兼容获取指令参数 =====================
     def get_event_params(self, event: AstrMessageEvent) -> str:
-        """
-        【标准方式】获取filter.command指令后的所有参数
-        优先使用event.args（astrbot官方标准参数列表），兜底兼容所有消息属性
-        同时打印日志，方便排查问题
-        """
-        # 1. 优先使用官方标准：event.args（空格分隔的参数列表，直接拼接）
         if hasattr(event, "args") and event.args:
             params_str = " ".join(event.args)
             logger.info(f"✅ 从event.args获取到参数: {params_str}")
-            # 清理特殊字符
             params_str = params_str.strip().replace("）", "").replace("(", "").replace("，", " ")
             return params_str
         
-        # 2. 兜底：兼容所有版本的消息属性
         msg = ""
         attr_list = ["message_str", "get_message_str", "content", "raw_message", "message"]
         for attr in attr_list:
             if hasattr(event, attr):
                 try:
                     if callable(getattr(event, attr)):
-                        # 如果是方法（比如get_message_str()），调用它
                         msg = getattr(event, attr)()
                     else:
-                        # 如果是属性，直接取值
                         msg = getattr(event, attr)
                     if msg:
                         logger.info(f"✅ 从event.{attr}获取到消息: {msg}")
@@ -127,12 +124,10 @@ class StarCitizenAttrPlugin(Star):
                 except:
                     continue
         
-        # 3. 剥离指令前缀（兜底处理，避免消息里包含指令本身）
         if msg:
             for cmd in ["/生成吃药方案", "生成吃药方案", "/生成训练方案", "生成训练方案"]:
                 if msg.startswith(cmd):
                     msg = msg[len(cmd):].strip()
-            # 清理特殊字符
             msg = msg.replace("）", "").replace("(", "").replace("，", " ")
         
         logger.info(f"📝 最终解析到的参数字符串: {msg}")
@@ -195,9 +190,6 @@ class StarCitizenAttrPlugin(Star):
 
     # ===================== 参数解析函数（优化版） =====================
     def parse_plan_params(self, params_str: str, plan_type: str = "medicine") -> dict:
-        """
-        解析参数字符串，plan_type由指令函数直接指定，无需从消息里判断
-        """
         params = {
             "max_limit": 110,
             "type": plan_type,
@@ -206,12 +198,10 @@ class StarCitizenAttrPlugin(Star):
             "target": {}
         }
 
-        # 提取训练上限
         limit_match = re.search(r"上限(\d+)", params_str)
         if limit_match:
             params["max_limit"] = int(limit_match.group(1))
 
-        # 提取策略
         strategy_match = re.search(r"策略(\w+)", params_str)
         if strategy_match:
             strategy = strategy_match.group(1)
@@ -222,7 +212,6 @@ class StarCitizenAttrPlugin(Star):
         elif "saveFive" in params_str:
             params["strategy"] = "saveFive"
 
-        # 提取各属性的当前/目标值
         for attr in ATTRS:
             attr_name = attr["name"]
             attr_match = re.search(f"{attr_name}当前(\d+)目标(\d+)", params_str)
@@ -240,7 +229,7 @@ class StarCitizenAttrPlugin(Star):
         logger.info(f"📊 解析完成的参数: {params}")
         return params
 
-    # ===================== 生成方案核心函数 =====================
+    # ===================== 生成方案核心函数（新增策略显示） =====================
     def generate_plan(self, params: dict) -> tuple:
         max_limit = params["max_limit"]
         plan_type = params["type"]
@@ -373,10 +362,14 @@ class StarCitizenAttrPlugin(Star):
                     result.append(f"[脸黑] - 五级药 - {target_attr['name']} {old_val}→{attr_values[attr_key]}")
                     last_record = {"isFive": True, "attr_key": attr_key, "start": old_val, "end": attr_values[attr_key]}
 
+        # 【核心修改】新增策略显示（放在汇总信息最前面）
+        strategy_cn = STRATEGY_MAP.get(strategy, "基础方案")  # 兜底显示基础方案
         summary = [
+            f"🎯 使用策略：{strategy_cn}（{strategy}）",  # 中英文对照显示
             f"✅ 总训练次数：{total_train - start_total}",
             f"✅ 五级药使用总量：{five_level_medicine}"
         ]
+        
         five_text = []
         for attr in ATTRS:
             if five_attr[attr["key"]] > 0:
@@ -441,21 +434,17 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
     async def generate_medicine_plan(self, event: AstrMessageEvent):
         logger.info("收到 /生成吃药方案 指令！")
         try:
-            # 【核心修复】获取参数
             params_str = self.get_event_params(event)
             if not params_str:
                 yield event.plain_result("❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base")
                 return
             
-            # 解析参数，指定类型为medicine
             params = self.parse_plan_params(params_str, plan_type="medicine")
             
-            # 校验：至少有一个目标属性>0
             if all(v == 0 for v in params["target"].values()):
                 yield event.plain_result("❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10")
                 return
             
-            # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
             result_text = "📋 吃药加点方案\n" + "\n".join(plan_lines) + "\n\n" + "\n".join(summary_lines)
             yield event.plain_result(result_text)
@@ -467,21 +456,17 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
     async def generate_train_plan(self, event: AstrMessageEvent):
         logger.info("收到 /生成训练方案 指令！")
         try:
-            # 【核心修复】获取参数
             params_str = self.get_event_params(event)
             if not params_str:
                 yield event.plain_result("❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5")
                 return
             
-            # 解析参数，指定类型为train
             params = self.parse_plan_params(params_str, plan_type="train")
             
-            # 校验：至少有一个目标属性>0
             if all(v == 0 for v in params["target"].values()):
                 yield event.plain_result("❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10")
                 return
             
-            # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
             result_text = "📋 训练加点方案\n" + "\n".join(plan_lines) + "\n\n" + "\n".join(summary_lines)
             yield event.plain_result(result_text)
