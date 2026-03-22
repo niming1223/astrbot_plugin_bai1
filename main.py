@@ -390,7 +390,7 @@ class StarCitizenAttrPlugin(Star):
 
         return result, summary
 
-    # ===================== 恢复菜单指令（无群号） =====================
+    # ===================== 菜单指令（新增小提示） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         logger.info("收到 /超时空星舰菜单 指令！")
@@ -407,10 +407,14 @@ class StarCitizenAttrPlugin(Star):
 ------------------------
 📌 策略说明：
 base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
+------------------------
+💡 小提示：
+- 策略可选：base/priorFour/saveFive
+- 属性包括：生命/攻击/维修/能力/武器/引擎/科技/导航/耐力
 """
         yield event.plain_result(menu_content)
 
-    # ===================== 恢复装备属性指令（无群号） =====================
+    # ===================== 装备属性指令 =====================
     @filter.command("装备属性")
     async def 装备属性(self, event: AstrMessageEvent):
         logger.info("收到 /装备属性 指令！")
@@ -437,7 +441,7 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
 """
             yield event.plain_result(fallback_text)
 
-    # ===================== 生成吃药方案（末尾加群号） =====================
+    # ===================== 生成吃药方案 =====================
     @filter.command("生成吃药方案")
     async def generate_medicine_plan(self, event: AstrMessageEvent):
         logger.info("收到 /生成吃药方案 指令！")
@@ -460,7 +464,7 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
             logger.error(f"生成吃药方案失败: {str(e)}", exc_info=True)
             yield event.plain_result(f"❌ 生成方案失败：{str(e)}\n请检查输入格式，示例：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base")
 
-    # ===================== 生成训练方案（末尾加群号） =====================
+    # ===================== 生成训练方案 =====================
     @filter.command("生成训练方案")
     async def generate_train_plan(self, event: AstrMessageEvent):
         logger.info("收到 /生成训练方案 指令！")
