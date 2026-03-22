@@ -98,6 +98,26 @@ class StarCitizenAttrPlugin(Star):
         if not os.path.exists(self.plugin_dir):
             os.makedirs(self.plugin_dir)
 
+    # ===================== 工具函数：兼容获取消息内容 =====================
+    def get_event_message(self, event: AstrMessageEvent) -> str:
+        """
+        兼容不同版本astrbot的消息获取方式
+        依次尝试：content → raw_message → message → 空字符串
+        """
+        msg = ""
+        # 优先尝试标准属性 content
+        if hasattr(event, "content"):
+            msg = event.content
+        # 备选 raw_message
+        elif hasattr(event, "raw_message"):
+            msg = event.raw_message
+        # 最后尝试 message
+        elif hasattr(event, "message"):
+            msg = event.message
+        # 去除首尾空格和特殊字符（如括号、换行）
+        msg = msg.strip().replace("）", "").replace("(", "").replace("）", "").replace("，", " ")
+        return msg
+
     # ===================== 原有功能：字体/图片生成 =====================
     def get_windows_font(self):
         """获取 Windows 系统自带的中文字体（绝对不会找不到）"""
@@ -210,6 +230,11 @@ class StarCitizenAttrPlugin(Star):
             # 校验策略是否合法
             if strategy in MEDICINE["order"].keys():
                 params["strategy"] = strategy
+        # 兼容用户直接输入策略名（无"策略"前缀）
+        elif "priorFour" in msg:
+            params["strategy"] = "priorFour"
+        elif "saveFive" in msg:
+            params["strategy"] = "saveFive"
 
         # 提取各属性的当前/目标值（增加容错：参数不完整时默认0）
         for attr in ATTRS:
@@ -416,7 +441,7 @@ class StarCitizenAttrPlugin(Star):
 
         return result, summary
 
-    # ===================== 指令处理函数（修复消息获取属性） =====================
+    # ===================== 指令处理函数 =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         """显示超时空星舰功能菜单（新增吃药/训练方案说明）"""
@@ -470,8 +495,13 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
         """生成吃药加点方案"""
         logger.info("收到 /生成吃药方案 指令！")
         try:
-            # 修复：使用 raw_message 获取消息内容
-            params = self.parse_plan_params(event.raw_message)
+            # 兼容获取消息内容
+            msg = self.get_event_message(event)
+            if not msg:
+                raise ValueError("未获取到有效指令参数")
+            
+            # 解析参数
+            params = self.parse_plan_params(msg)
             # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
             # 拼接结果
@@ -487,8 +517,13 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
         """生成训练加点方案"""
         logger.info("收到 /生成训练方案 指令！")
         try:
-            # 修复：使用 raw_message 获取消息内容
-            params = self.parse_plan_params(event.raw_message)
+            # 兼容获取消息内容
+            msg = self.get_event_message(event)
+            if not msg:
+                raise ValueError("未获取到有效指令参数")
+            
+            # 解析参数
+            params = self.parse_plan_params(msg)
             params["type"] = "train"  # 强制指定为训练方案
             # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
