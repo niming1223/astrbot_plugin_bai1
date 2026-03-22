@@ -264,7 +264,7 @@ def calc_attr_plan(attr_name, base, equip1, equip2, target):
     
     return f"📊 {attr_name} 属性规划结果\n------------------------\n基础值：{base}\n装备总和：{eq_sum}\n目标值：{target}\n✅ 需要训练值：{train_val}"
 
-# ===================== 插件主类（AstrBot v4.20.0 完整版） =====================
+# ===================== 插件主类（AstrBot v4.20.0 最终修复版） =====================
 @register("starcitizen_plugin", "超时空星舰工具", "超时空星舰训练计算器", "2.0.0")
 class StarCitizenPlugin(Star):
     def __init__(self, context: Context):
@@ -325,11 +325,12 @@ class StarCitizenPlugin(Star):
             logger.error(f"生成装备图片失败：{e}")
             return None
 
-    # ===================== 指令函数（全部返回tuple格式，框架必识别） =====================
+    # ===================== 指令函数（修复user_id属性 + tuple返回值） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         """核心指令：显示功能菜单"""
-        logger.info(f"收到 /超时空星舰菜单 指令（用户ID：{event.sender_id}）")
+        # 关键修复：用user_id替代sender_id
+        logger.info(f"收到 /超时空星舰菜单 指令（用户ID：{event.user_id}）")
         menu_content = """📋 超时空星舰 完整工具菜单
 ------------------------
 🔧 基础功能
@@ -347,13 +348,13 @@ class StarCitizenPlugin(Star):
 /属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]
 例：/属性规划 生命 基础10 装备15 装备23 目标100
 """
-        # 关键：返回tuple格式（框架强制要求）
+        # 返回tuple格式（框架强制要求）
         return (menu_content, )
 
     @filter.command("装备属性")
     async def 装备属性(self, event: AstrMessageEvent):
         """指令：发送装备属性表格（图片+文字兜底）"""
-        logger.info(f"收到 /装备属性 指令（用户ID：{event.sender_id}）")
+        logger.info(f"收到 /装备属性 指令（用户ID：{event.user_id}）")
         # 尝试生成图片
         img_path = self._create_equip_image()
         if img_path and os.path.exists(img_path):
@@ -381,7 +382,7 @@ class StarCitizenPlugin(Star):
     @filter.command("训练上限")
     async def 训练上限(self, event: AstrMessageEvent):
         """指令：设置训练上限"""
-        user_id = event.sender_id
+        user_id = event.user_id  # 修复：用user_id
         message = event.message.strip()
         logger.info(f"收到 /训练上限 指令（用户ID：{user_id}，参数：{message}）")
         
@@ -409,7 +410,7 @@ class StarCitizenPlugin(Star):
     @filter.command("当前属性")
     async def 当前属性(self, event: AstrMessageEvent):
         """指令：设置/查看当前属性"""
-        user_id = event.sender_id
+        user_id = event.user_id  # 修复：用user_id
         message = event.message.strip()
         logger.info(f"收到 /当前属性 指令（用户ID：{user_id}，参数：{message}）")
         
@@ -470,7 +471,7 @@ class StarCitizenPlugin(Star):
     @filter.command("目标属性")
     async def 目标属性(self, event: AstrMessageEvent):
         """指令：设置/查看目标属性"""
-        user_id = event.sender_id
+        user_id = event.user_id  # 修复：用user_id
         message = event.message.strip()
         logger.info(f"收到 /目标属性 指令（用户ID：{user_id}，参数：{message}）")
         
@@ -531,7 +532,7 @@ class StarCitizenPlugin(Star):
     @filter.command("生成吃药方案")
     async def 生成吃药方案(self, event: AstrMessageEvent):
         """指令：生成吃药加点方案"""
-        user_id = event.sender_id
+        user_id = event.user_id  # 修复：用user_id
         message = event.message.strip()
         logger.info(f"收到 /生成吃药方案 指令（用户ID：{user_id}，参数：{message}）")
         
@@ -569,7 +570,7 @@ class StarCitizenPlugin(Star):
     @filter.command("生成训练方案")
     async def 生成训练方案(self, event: AstrMessageEvent):
         """指令：生成纯训练加点方案"""
-        user_id = event.sender_id
+        user_id = event.user_id  # 修复：用user_id
         logger.info(f"收到 /生成训练方案 指令（用户ID：{user_id}）")
         
         # 检查用户数据是否初始化
@@ -596,7 +597,7 @@ class StarCitizenPlugin(Star):
     async def 属性规划(self, event: AstrMessageEvent):
         """指令：属性规划计算（单独使用）"""
         message = event.message.strip()
-        logger.info(f"收到 /属性规划 指令（参数：{message}）")
+        logger.info(f"收到 /属性规划 指令（用户ID：{event.user_id}，参数：{message}）")
         
         # 解析参数
         params = message.replace("/属性规划", "").strip()
