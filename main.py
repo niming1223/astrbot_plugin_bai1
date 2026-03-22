@@ -1,7 +1,6 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from PIL import Image, ImageDraw, ImageFont
 import os
 import sys
 import re
@@ -59,27 +58,15 @@ ATTRS = [
     {"name": "耐力", "key": "endurance"}
 ]
 
-# 【新增】策略名称映射（英文→中文）
+# 策略名称映射（英文→中文）
 STRATEGY_MAP = {
     "base": "基础方案",
     "priorFour": "优先四级药方案",
     "saveFive": "最省五级药方案"
 }
 
-# 装备属性表格数据
-TABLE_DATA = [
-    ["装备属性", "英语", "橙装", "金装"],
-    ["HP", "HP", "3.0", "3.0"],
-    ["攻击", "Attack", "0.7", "0.7"],
-    ["能力", "Ability", "15.7", "15.7"],
-    ["火抗", "FireResistance", "63.7", "63.7"],
-    ["耐力", "Stamina", "22", "26"],
-    ["武器", "Weapon", "6.7", "6.7"],
-    ["科技", "Sciece", "9.7", "9.7"],
-    ["导航", "Pilot", "10.5", "10.5"],
-    ["引擎", "Engine", "7.5", "9"],
-    ["维修", "Repair", "0.6", "0.7"],
-]
+# 尾部固定文案
+FOOTER_TEXT = "天啟舰队欢迎你，群号951239404"
 
 # ===================== 核心计算函数 =====================
 def calc_rate(max_limit: int, total_train: int, attr_value: int, fatigue_val: float, factor: float) -> float:
@@ -97,9 +84,6 @@ class StarCitizenAttrPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         logger.info("✅ 超时空星舰插件加载成功！")
-        self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
-        if not os.path.exists(self.plugin_dir):
-            os.makedirs(self.plugin_dir)
 
     # ===================== 100%兼容获取指令参数 =====================
     def get_event_params(self, event: AstrMessageEvent) -> str:
@@ -133,62 +117,7 @@ class StarCitizenAttrPlugin(Star):
         logger.info(f"📝 最终解析到的参数字符串: {msg}")
         return msg
 
-    # ===================== 原有功能：字体/图片生成 =====================
-    def get_windows_font(self):
-        font_paths = [
-            os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "simhei.ttf"),
-            os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "msyh.ttc"),
-            os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "simsun.ttc"),
-        ]
-        for font_path in font_paths:
-            if os.path.exists(font_path):
-                try:
-                    return ImageFont.truetype(font_path, 20)
-                except:
-                    continue
-        return ImageFont.load_default()
-
-    def generate_attr_image(self):
-        cell_width = 180
-        cell_height = 40
-        rows = len(TABLE_DATA)
-        cols = len(TABLE_DATA[0])
-        img_width = cell_width * cols
-        img_height = cell_height * rows
-        image = Image.new('RGB', (img_width, img_height), color=(255, 255, 255))
-        draw = ImageDraw.Draw(image)
-        font = self.get_windows_font()
-
-        for i in range(rows + 1):
-            y = i * cell_height
-            draw.line([(0, y), (img_width, y)], fill=(0, 0, 0), width=2)
-        for j in range(cols + 1):
-            x = j * cell_width
-            draw.line([(x, 0), (x, img_height)], fill=(0, 0, 0), width=2)
-
-        for i in range(rows):
-            for j in range(cols):
-                text = TABLE_DATA[i][j]
-                try:
-                    bbox = draw.textbbox((0, 0), text, font=font)
-                    text_w = bbox[2] - bbox[0]
-                    text_h = bbox[3] - bbox[1]
-                except:
-                    text_w, text_h = draw.textsize(text, font=font)
-                x = j * cell_width + (cell_width - text_w) // 2
-                y = i * cell_height + (cell_height - text_h) // 2
-                draw.text((x, y), text, fill=(0, 0, 0), font=font)
-
-        img_path = os.path.join(self.plugin_dir, "equip_attr.png")
-        if os.path.exists(img_path):
-            try:
-                os.remove(img_path)
-            except:
-                pass
-        image.save(img_path, "PNG")
-        return img_path
-
-    # ===================== 参数解析函数（优化版） =====================
+    # ===================== 参数解析函数 =====================
     def parse_plan_params(self, params_str: str, plan_type: str = "medicine") -> dict:
         params = {
             "max_limit": 110,
@@ -229,7 +158,7 @@ class StarCitizenAttrPlugin(Star):
         logger.info(f"📊 解析完成的参数: {params}")
         return params
 
-    # ===================== 生成方案核心函数（新增策略显示） =====================
+    # ===================== 生成方案核心函数 =====================
     def generate_plan(self, params: dict) -> tuple:
         max_limit = params["max_limit"]
         plan_type = params["type"]
@@ -362,10 +291,10 @@ class StarCitizenAttrPlugin(Star):
                     result.append(f"[脸黑] - 五级药 - {target_attr['name']} {old_val}→{attr_values[attr_key]}")
                     last_record = {"isFive": True, "attr_key": attr_key, "start": old_val, "end": attr_values[attr_key]}
 
-        # 【核心修改】新增策略显示（放在汇总信息最前面）
-        strategy_cn = STRATEGY_MAP.get(strategy, "基础方案")  # 兜底显示基础方案
+        # 汇总信息（包含策略显示）
+        strategy_cn = STRATEGY_MAP.get(strategy, "基础方案")
         summary = [
-            f"🎯 使用策略：{strategy_cn}（{strategy}）",  # 中英文对照显示
+            f"🎯 使用策略：{strategy_cn}（{strategy}）",
             f"✅ 总训练次数：{total_train - start_total}",
             f"✅ 五级药使用总量：{five_level_medicine}"
         ]
@@ -381,68 +310,26 @@ class StarCitizenAttrPlugin(Star):
             if attr_values[attr["key"]] > 0:
                 final_attrs.append(f"{attr['name']}{attr_values[attr['key']]}")
         summary.append(f"✅ 最终属性：{' '.join(final_attrs)}")
+        
+        # 添加尾部固定文案
+        summary.append(f"\n{FOOTER_TEXT}")
 
         return result, summary
 
     # ===================== 指令处理函数 =====================
-    @filter.command("超时空星舰菜单")
-    async def 超时空星舰菜单(self, event: AstrMessageEvent):
-        logger.info("收到 /超时空星舰菜单 指令！")
-        menu_content = """📋 超时空星舰 功能菜单
-------------------------
-/超时空星舰菜单   - 显示此菜单
-/装备属性 - 查看橙装/金装属性对比（图片版）
-/生成吃药方案 - 生成吃药加点方案
-/生成训练方案 - 生成训练加点方案
-------------------------
-📌 指令示例：
-/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base
-/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5
-------------------------
-📌 策略说明：
-base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
-"""
-        yield event.plain_result(menu_content)
-
-    @filter.command("装备属性")
-    async def 装备属性(self, event: AstrMessageEvent):
-        logger.info("收到 /装备属性 指令！")
-        try:
-            img_path = self.generate_attr_image()
-            yield event.image_result(img_path)
-        except Exception as e:
-            logger.error(f"生成图片失败: {str(e)}")
-            fallback_text = """📊 超时空星舰装备属性对比表
-┌──────────┬─────────────────┬────────┬────────┐
-│ 装备属性 │ 英语            │ 橙装   │ 金装   │
-├──────────┼─────────────────┼────────┼────────┤
-│ HP       │ HP              │ 3.0    │ 3.0    │
-│ 攻击     │ Attack          │ 0.7    │ 0.7    │
-│ 能力     │ Ability         │ 15.7   │ 15.7   │
-│ 火抗     │ FireResistance  │ 63.7   │ 63.7   │
-│ 耐力     │ Stamina         │ 22     │ 26     │
-│ 武器     │ Weapon          │ 6.7    │ 6.7    │
-│ 科技     │ Sciece          │ 9.7    │ 9.7    │
-│ 导航     │ Pilot           │ 10.5   │ 10.5   │
-│ 引擎     │ Engine          │ 7.5    │ 9      │
-│ 维修     │ Repair          │ 0.6    │ 0.7    │
-└──────────┴─────────────────┴────────┴────────┘
-"""
-            yield event.plain_result(fallback_text)
-
     @filter.command("生成吃药方案")
     async def generate_medicine_plan(self, event: AstrMessageEvent):
         logger.info("收到 /生成吃药方案 指令！")
         try:
             params_str = self.get_event_params(event)
             if not params_str:
-                yield event.plain_result("❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base")
+                yield event.plain_result(f"❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base\n\n{FOOTER_TEXT}")
                 return
             
             params = self.parse_plan_params(params_str, plan_type="medicine")
             
             if all(v == 0 for v in params["target"].values()):
-                yield event.plain_result("❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10")
+                yield event.plain_result(f"❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10\n\n{FOOTER_TEXT}")
                 return
             
             plan_lines, summary_lines = self.generate_plan(params)
@@ -450,7 +337,7 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
             yield event.plain_result(result_text)
         except Exception as e:
             logger.error(f"生成吃药方案失败: {str(e)}", exc_info=True)
-            yield event.plain_result(f"❌ 生成方案失败：{str(e)}\n请检查输入格式，示例：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base")
+            yield event.plain_result(f"❌ 生成方案失败：{str(e)}\n请检查输入格式，示例：\n/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base\n\n{FOOTER_TEXT}")
 
     @filter.command("生成训练方案")
     async def generate_train_plan(self, event: AstrMessageEvent):
@@ -458,13 +345,13 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
         try:
             params_str = self.get_event_params(event)
             if not params_str:
-                yield event.plain_result("❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5")
+                yield event.plain_result(f"❌ 未获取到有效参数！\n请按照示例格式发送：\n/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5\n\n{FOOTER_TEXT}")
                 return
             
             params = self.parse_plan_params(params_str, plan_type="train")
             
             if all(v == 0 for v in params["target"].values()):
-                yield event.plain_result("❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10")
+                yield event.plain_result(f"❌ 请至少设置一个属性的目标值！\n示例：生命当前0目标10\n\n{FOOTER_TEXT}")
                 return
             
             plan_lines, summary_lines = self.generate_plan(params)
@@ -472,4 +359,4 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
             yield event.plain_result(result_text)
         except Exception as e:
             logger.error(f"生成训练方案失败: {str(e)}", exc_info=True)
-            yield event.plain_result(f"❌ 生成方案失败：{str(e)}\n请检查输入格式，示例：\n/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5")
+            yield event.plain_result(f"❌ 生成方案失败：{str(e)}\n请检查输入格式，示例：\n/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5\n\n{FOOTER_TEXT}")
