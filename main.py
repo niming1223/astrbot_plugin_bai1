@@ -6,7 +6,7 @@ import os
 import sys
 import re
 
-# ===================== 新增：训练/吃药计算器核心配置 =====================
+# ===================== 训练/吃药计算器核心配置 =====================
 # 疲劳值配置
 FATIGUE = {"大笑": 1, "微笑": 0.5, "流汗": 0.33}
 FATIGUE_ORDER = ["大笑", "微笑", "流汗"]
@@ -179,7 +179,7 @@ class StarCitizenAttrPlugin(Star):
         image.save(img_path, "PNG")
         return img_path
 
-    # ===================== 新增：参数解析函数 =====================
+    # ===================== 新增：参数解析函数（增加容错） =====================
     def parse_plan_params(self, msg: str) -> dict:
         """
         解析用户输入的参数，格式示例：
@@ -194,7 +194,7 @@ class StarCitizenAttrPlugin(Star):
             "target": {}        # 目标属性
         }
 
-        # 提取训练上限
+        # 提取训练上限（容错：无数字则用默认值）
         limit_match = re.search(r"上限(\d+)", msg)
         if limit_match:
             params["max_limit"] = int(limit_match.group(1))
@@ -203,19 +203,26 @@ class StarCitizenAttrPlugin(Star):
         if "生成训练方案" in msg:
             params["type"] = "train"
 
-        # 提取策略
+        # 提取策略（容错：无策略则用base）
         strategy_match = re.search(r"策略(\w+)", msg)
         if strategy_match:
-            params["strategy"] = strategy_match.group(1)
+            strategy = strategy_match.group(1)
+            # 校验策略是否合法
+            if strategy in MEDICINE["order"].keys():
+                params["strategy"] = strategy
 
-        # 提取各属性的当前/目标值
+        # 提取各属性的当前/目标值（增加容错：参数不完整时默认0）
         for attr in ATTRS:
             attr_name = attr["name"]
-            # 匹配 "生命当前0目标10" 格式
+            # 匹配 "生命当前0目标10" 格式（容错：缺少数字时默认0）
             attr_match = re.search(f"{attr_name}当前(\d+)目标(\d+)", msg)
             if attr_match:
-                params["current"][attr["key"]] = int(attr_match.group(1))
-                params["target"][attr["key"]] = int(attr_match.group(2))
+                try:
+                    params["current"][attr["key"]] = int(attr_match.group(1))
+                    params["target"][attr["key"]] = int(attr_match.group(2))
+                except:
+                    params["current"][attr["key"]] = 0
+                    params["target"][attr["key"]] = 0
             else:
                 # 未指定则默认0
                 params["current"][attr["key"]] = 0
@@ -409,7 +416,7 @@ class StarCitizenAttrPlugin(Star):
 
         return result, summary
 
-    # ===================== 指令处理函数 =====================
+    # ===================== 指令处理函数（修复消息获取属性） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         """显示超时空星舰功能菜单（新增吃药/训练方案说明）"""
@@ -463,8 +470,8 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
         """生成吃药加点方案"""
         logger.info("收到 /生成吃药方案 指令！")
         try:
-            # 解析参数
-            params = self.parse_plan_params(event.message)
+            # 修复：使用 raw_message 获取消息内容
+            params = self.parse_plan_params(event.raw_message)
             # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
             # 拼接结果
@@ -480,8 +487,8 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
         """生成训练加点方案"""
         logger.info("收到 /生成训练方案 指令！")
         try:
-            # 解析参数
-            params = self.parse_plan_params(event.message)
+            # 修复：使用 raw_message 获取消息内容
+            params = self.parse_plan_params(event.raw_message)
             params["type"] = "train"  # 强制指定为训练方案
             # 生成方案
             plan_lines, summary_lines = self.generate_plan(params)
