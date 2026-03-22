@@ -1,6 +1,6 @@
-name: astrbot_plugin_starcitizen_attr
-display_name: 超时空星舰装备查询
-desc: 超时空星舰游戏装备属性查询插件
-version: v1.0.0
+name: astrbot_plugin_starcitizen
+display_name: 超时空星舰完整工具
+desc: 超时空星舰装备属性查询+可交互训练计算器+属性规划器
+version: v2.0.0
 author: YourName
 repo: https://github.com/niming1223/astrbot_plugin_bai1.git
