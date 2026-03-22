@@ -292,10 +292,10 @@ class StarCitizenPlugin(Star):
         img.save(img_path, "PNG")
         return img_path
 
-    # ===================== 指令函数 =====================
+    # ===================== 指令函数（修复参数解析问题） =====================
     @filter.command("超时空星舰菜单")
-    async def 超时空星舰菜单(self, *args, **kwargs):
-        event = args[0]
+    async def 超时空星舰菜单(self, event: AstrMessageEvent):
+        """显示功能菜单"""
         logger.info("收到 /超时空星舰菜单 指令！")
         menu_content = """📋 超时空星舰 完整工具菜单
 ------------------------
@@ -314,15 +314,15 @@ class StarCitizenPlugin(Star):
 /属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]
 例：/属性规划 生命 基础10 装备15 装备23 目标100
 """
-        yield event.plain_result(menu_content)
+        await event.reply(menu_content)
 
     @filter.command("装备属性")
-    async def 装备属性(self, *args, **kwargs):
-        event = args[0]
+    async def 装备属性(self, event: AstrMessageEvent):
+        """生成装备属性图片"""
         logger.info("收到 /装备属性 指令！")
         try:
             img_path = self._create_equip_image()
-            yield event.image_result(img_path)
+            await event.reply(image_path=img_path)
         except Exception as e:
             logger.error(f"装备属性图片生成失败：{e}")
             fallback = """📊 超时空星舰装备属性对比表
@@ -340,23 +340,28 @@ class StarCitizenPlugin(Star):
 │ 引擎     │ Engine          │ 7.5    │ 9      │
 │ 维修     │ Repair          │ 0.6    │ 0.7    │
 └──────────┴─────────────────┴────────┴────────┘"""
-            yield event.plain_result(fallback)
+            await event.reply(fallback)
 
     @filter.command("训练上限")
-    async def 训练上限(self, *args, **kwargs):
-        event = args[0]
-        user_id = event.get_sender_id()
-        message = event.get_message().strip()
+    async def 训练上限(self, event: AstrMessageEvent):
+        """设置训练上限"""
+        user_id = event.sender_id
+        message = event.message.strip()
         logger.info(f"收到 /训练上限 指令，用户：{user_id}，内容：{message}")
         
         # 解析数值
         try:
-            limit = int(message.split(" ")[1])
+            # 拆分指令和参数（去掉指令前缀）
+            params = message.replace("/训练上限", "").strip()
+            if not params:
+                await event.reply("❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
+                return
+            limit = int(params)
             if limit <= 0:
-                yield event.plain_result("❌ 训练上限必须是大于0的数字！")
+                await event.reply("❌ 训练上限必须是大于0的数字！")
                 return
         except:
-            yield event.plain_result("❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
+            await event.reply("❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
             return
         
         # 保存用户设置
@@ -367,13 +372,13 @@ class StarCitizenPlugin(Star):
                 "target_attr": {item["key"]: 0 for item in ATTR_LIST}
             }
         USER_DATA[user_id]["train_limit"] = limit
-        yield event.plain_result(f"✅ 训练上限已设置为：{limit}")
+        await event.reply(f"✅ 训练上限已设置为：{limit}")
 
     @filter.command("当前属性")
-    async def 当前属性(self, *args, **kwargs):
-        event = args[0]
-        user_id = event.get_sender_id()
-        message = event.get_message().strip()
+    async def 当前属性(self, event: AstrMessageEvent):
+        """设置/查看当前属性"""
+        user_id = event.sender_id
+        message = event.message.strip()
         logger.info(f"收到 /当前属性 指令，用户：{user_id}")
         
         # 初始化用户数据
@@ -384,25 +389,28 @@ class StarCitizenPlugin(Star):
                 "target_attr": {item["key"]: 0 for item in ATTR_LIST}
             }
         
-        # 解析属性
-        parts = message.split(" ")[1:]
-        if not parts:
+        # 解析参数（去掉指令前缀）
+        params = message.replace("/当前属性", "").strip()
+        if not params:
             # 显示当前属性
             current = USER_DATA[user_id]["current_attr"]
             text = "📊 当前属性设置：\n"
             for item in ATTR_LIST:
                 text += f"{item['name']}：{current[item['key']]}\n"
-            yield event.plain_result(text)
+            await event.reply(text)
             return
         
         # 设置属性
         try:
+            parts = params.split(" ")
             for part in parts:
+                if not part:
+                    continue
                 # 拆分属性名和数值
                 attr_name = ""
                 value_str = ""
                 for i, c in enumerate(part):
-                    if c.isdigit():
+                    if c.isdigit() or c == "-":
                         attr_name = part[:i]
                         value_str = part[i:]
                         break
@@ -414,8 +422,9 @@ class StarCitizenPlugin(Star):
                     continue
                 value = int(value_str)
                 USER_DATA[user_id]["current_attr"][attr_key] = value
-        except:
-            yield event.plain_result("❌ 格式错误！正确格式：/当前属性 [属性名+数值]，例：/当前属性 生命0 攻击0 维修0")
+        except Exception as e:
+            logger.error(f"解析当前属性失败：{e}")
+            await event.reply("❌ 格式错误！正确格式：/当前属性 [属性名+数值]，例：/当前属性 生命0 攻击0 维修0")
             return
         
         # 返回结果
@@ -423,13 +432,13 @@ class StarCitizenPlugin(Star):
         text = "✅ 当前属性已更新：\n"
         for item in ATTR_LIST:
             text += f"{item['name']}：{current[item['key']]}\n"
-        yield event.plain_result(text)
+        await event.reply(text)
 
     @filter.command("目标属性")
-    async def 目标属性(self, *args, **kwargs):
-        event = args[0]
-        user_id = event.get_sender_id()
-        message = event.get_message().strip()
+    async def 目标属性(self, event: AstrMessageEvent):
+        """设置/查看目标属性"""
+        user_id = event.sender_id
+        message = event.message.strip()
         logger.info(f"收到 /目标属性 指令，用户：{user_id}")
         
         # 初始化用户数据
@@ -440,25 +449,28 @@ class StarCitizenPlugin(Star):
                 "target_attr": {item["key"]: 0 for item in ATTR_LIST}
             }
         
-        # 解析属性
-        parts = message.split(" ")[1:]
-        if not parts:
+        # 解析参数（去掉指令前缀）
+        params = message.replace("/目标属性", "").strip()
+        if not params:
             # 显示目标属性
             target = USER_DATA[user_id]["target_attr"]
             text = "📊 目标属性设置：\n"
             for item in ATTR_LIST:
                 text += f"{item['name']}：{target[item['key']]}\n"
-            yield event.plain_result(text)
+            await event.reply(text)
             return
         
         # 设置属性
         try:
+            parts = params.split(" ")
             for part in parts:
+                if not part:
+                    continue
                 # 拆分属性名和数值
                 attr_name = ""
                 value_str = ""
                 for i, c in enumerate(part):
-                    if c.isdigit():
+                    if c.isdigit() or c == "-":
                         attr_name = part[:i]
                         value_str = part[i:]
                         break
@@ -470,8 +482,9 @@ class StarCitizenPlugin(Star):
                     continue
                 value = int(value_str)
                 USER_DATA[user_id]["target_attr"][attr_key] = value
-        except:
-            yield event.plain_result("❌ 格式错误！正确格式：/目标属性 [属性名+数值]，例：/目标属性 生命50 攻击40 维修30")
+        except Exception as e:
+            logger.error(f"解析目标属性失败：{e}")
+            await event.reply("❌ 格式错误！正确格式：/目标属性 [属性名+数值]，例：/目标属性 生命50 攻击40 维修30")
             return
         
         # 返回结果
@@ -479,25 +492,25 @@ class StarCitizenPlugin(Star):
         text = "✅ 目标属性已更新：\n"
         for item in ATTR_LIST:
             text += f"{item['name']}：{target[item['key']]}\n"
-        yield event.plain_result(text)
+        await event.reply(text)
 
     @filter.command("生成吃药方案")
-    async def 生成吃药方案(self, *args, **kwargs):
-        event = args[0]
-        user_id = event.get_sender_id()
-        message = event.get_message().strip()
+    async def 生成吃药方案(self, event: AstrMessageEvent):
+        """生成吃药加点方案"""
+        user_id = event.sender_id
+        message = event.message.strip()
         logger.info(f"收到 /生成吃药方案 指令，用户：{user_id}")
         
         # 检查用户数据
         if user_id not in USER_DATA:
-            yield event.plain_result("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
+            await event.reply("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
             return
         
-        # 解析策略
-        parts = message.split(" ")
-        strategy = parts[1] if len(parts) >= 2 else "base"
+        # 解析策略（去掉指令前缀）
+        params = message.replace("/生成吃药方案", "").strip()
+        strategy = params if params else "基础"
         if strategy not in ["基础", "最省五药", "优先四药"]:
-            yield event.plain_result("❌ 策略错误！可选策略：基础/最省五药/优先四药，例：/生成吃药方案 基础")
+            await event.reply("❌ 策略错误！可选策略：基础/最省五药/优先四药，例：/生成吃药方案 基础")
             return
         # 转换策略名
         strategy_map = {"基础": "base", "最省五药": "saveFive", "优先四药": "priorFour"}
@@ -508,26 +521,25 @@ class StarCitizenPlugin(Star):
             result = generate_plan(user_id, "medicine", strategy_key)
             # 拆分长文本，避免消息过长
             if len(result) > 3000:
-                # 分两段发送
                 lines = result.split("\n")
                 mid = len(lines) // 2
-                yield event.plain_result("\n".join(lines[:mid]))
-                yield event.plain_result("\n".join(lines[mid:]))
+                await event.reply("\n".join(lines[:mid]))
+                await event.reply("\n".join(lines[mid:]))
             else:
-                yield event.plain_result(result)
+                await event.reply(result)
         except Exception as e:
             logger.error(f"生成吃药方案失败：{e}")
-            yield event.plain_result(f"❌ 生成方案失败：{str(e)}")
+            await event.reply(f"❌ 生成方案失败：{str(e)}")
 
     @filter.command("生成训练方案")
-    async def 生成训练方案(self, *args, **kwargs):
-        event = args[0]
-        user_id = event.get_sender_id()
+    async def 生成训练方案(self, event: AstrMessageEvent):
+        """生成全训练加点方案"""
+        user_id = event.sender_id
         logger.info(f"收到 /生成训练方案 指令，用户：{user_id}")
         
         # 检查用户数据
         if user_id not in USER_DATA:
-            yield event.plain_result("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
+            await event.reply("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
             return
         
         # 生成方案
@@ -537,36 +549,39 @@ class StarCitizenPlugin(Star):
             if len(result) > 3000:
                 lines = result.split("\n")
                 mid = len(lines) // 2
-                yield event.plain_result("\n".join(lines[:mid]))
-                yield event.plain_result("\n".join(lines[mid:]))
+                await event.reply("\n".join(lines[:mid]))
+                await event.reply("\n".join(lines[mid:]))
             else:
-                yield event.plain_result(result)
+                await event.reply(result)
         except Exception as e:
             logger.error(f"生成训练方案失败：{e}")
-            yield event.plain_result(f"❌ 生成方案失败：{str(e)}")
+            await event.reply(f"❌ 生成方案失败：{str(e)}")
 
     @filter.command("属性规划")
-    async def 属性规划(self, *args, **kwargs):
-        event = args[0]
-        message = event.get_message().strip()
+    async def 属性规划(self, event: AstrMessageEvent):
+        """属性规划计算"""
+        message = event.message.strip()
         logger.info(f"收到 /属性规划 指令，内容：{message}")
         
-        # 解析参数
-        parts = message.split(" ")
+        # 解析参数（去掉指令前缀）
+        params = message.replace("/属性规划", "").strip()
+        parts = params.split(" ")
+        parts = [p for p in parts if p]  # 过滤空字符串
         if len(parts) < 5:
-            yield event.plain_result("❌ 格式错误！正确格式：/属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]\n例：/属性规划 生命 基础10 装备15 装备23 目标100")
+            await event.reply("❌ 格式错误！正确格式：/属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]\n例：/属性规划 生命 基础10 装备15 装备23 目标100")
             return
         
         try:
-            attr_name = parts[1]
-            base = int(parts[2].replace("基础", ""))
-            equip1 = int(parts[3].replace("装备1", ""))
-            equip2 = int(parts[4].replace("装备2", ""))
-            target = float(parts[5].replace("目标", ""))
-        except:
-            yield event.plain_result("❌ 格式错误！请检查参数格式，例：/属性规划 生命 基础10 装备15 装备23 目标100")
+            attr_name = parts[0]
+            base = int(parts[1].replace("基础", ""))
+            equip1 = int(parts[2].replace("装备1", ""))
+            equip2 = int(parts[3].replace("装备2", ""))
+            target = float(parts[4].replace("目标", ""))
+        except Exception as e:
+            logger.error(f"解析属性规划参数失败：{e}")
+            await event.reply("❌ 格式错误！请检查参数格式，例：/属性规划 生命 基础10 装备15 装备23 目标100")
             return
         
         # 计算结果
         result = calc_attr_plan(attr_name, base, equip1, equip2, target)
-        yield event.plain_result(result)
+        await event.reply(result)
