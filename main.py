@@ -238,11 +238,13 @@ def calc_attr_plan(attr_name, base, equip1, equip2, target):
     train_val = round(train_val)
     return f"📊 {attr_name} 属性规划结果\n------------------------\n基础值：{base}\n装备总和：{eq_sum}\n目标值：{target}\n✅ 需要训练值：{train_val}"
 
-# ===================== 插件主类 =====================
+# ===================== 插件主类（适配AstrBot框架） =====================
 @register("starcitizen_plugin", "YourName", "超时空星舰完整工具插件", "2.0.0")
 class StarCitizenPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+        # 保存context用于发送消息（核心修复点）
+        self.context = context
         logger.info("✅ 超时空星舰完整工具插件加载成功！")
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
         self.font = self._get_windows_font()
@@ -292,7 +294,7 @@ class StarCitizenPlugin(Star):
         img.save(img_path, "PNG")
         return img_path
 
-    # ===================== 指令函数（修复参数解析问题） =====================
+    # ===================== 指令函数（适配框架的消息发送方式） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         """显示功能菜单"""
@@ -314,7 +316,8 @@ class StarCitizenPlugin(Star):
 /属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]
 例：/属性规划 生命 基础10 装备15 装备23 目标100
 """
-        await event.reply(menu_content)
+        # 核心修复：使用context.send发送消息
+        await self.context.send(event, menu_content)
 
     @filter.command("装备属性")
     async def 装备属性(self, event: AstrMessageEvent):
@@ -322,7 +325,8 @@ class StarCitizenPlugin(Star):
         logger.info("收到 /装备属性 指令！")
         try:
             img_path = self._create_equip_image()
-            await event.reply(image_path=img_path)
+            # 发送图片消息
+            await self.context.send(event, image_path=img_path)
         except Exception as e:
             logger.error(f"装备属性图片生成失败：{e}")
             fallback = """📊 超时空星舰装备属性对比表
@@ -340,7 +344,7 @@ class StarCitizenPlugin(Star):
 │ 引擎     │ Engine          │ 7.5    │ 9      │
 │ 维修     │ Repair          │ 0.6    │ 0.7    │
 └──────────┴─────────────────┴────────┴────────┘"""
-            await event.reply(fallback)
+            await self.context.send(event, fallback)
 
     @filter.command("训练上限")
     async def 训练上限(self, event: AstrMessageEvent):
@@ -354,14 +358,14 @@ class StarCitizenPlugin(Star):
             # 拆分指令和参数（去掉指令前缀）
             params = message.replace("/训练上限", "").strip()
             if not params:
-                await event.reply("❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
+                await self.context.send(event, "❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
                 return
             limit = int(params)
             if limit <= 0:
-                await event.reply("❌ 训练上限必须是大于0的数字！")
+                await self.context.send(event, "❌ 训练上限必须是大于0的数字！")
                 return
         except:
-            await event.reply("❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
+            await self.context.send(event, "❌ 格式错误！正确格式：/训练上限 [数值]，例：/训练上限 110")
             return
         
         # 保存用户设置
@@ -372,7 +376,7 @@ class StarCitizenPlugin(Star):
                 "target_attr": {item["key"]: 0 for item in ATTR_LIST}
             }
         USER_DATA[user_id]["train_limit"] = limit
-        await event.reply(f"✅ 训练上限已设置为：{limit}")
+        await self.context.send(event, f"✅ 训练上限已设置为：{limit}")
 
     @filter.command("当前属性")
     async def 当前属性(self, event: AstrMessageEvent):
@@ -397,7 +401,7 @@ class StarCitizenPlugin(Star):
             text = "📊 当前属性设置：\n"
             for item in ATTR_LIST:
                 text += f"{item['name']}：{current[item['key']]}\n"
-            await event.reply(text)
+            await self.context.send(event, text)
             return
         
         # 设置属性
@@ -424,7 +428,7 @@ class StarCitizenPlugin(Star):
                 USER_DATA[user_id]["current_attr"][attr_key] = value
         except Exception as e:
             logger.error(f"解析当前属性失败：{e}")
-            await event.reply("❌ 格式错误！正确格式：/当前属性 [属性名+数值]，例：/当前属性 生命0 攻击0 维修0")
+            await self.context.send(event, "❌ 格式错误！正确格式：/当前属性 [属性名+数值]，例：/当前属性 生命0 攻击0 维修0")
             return
         
         # 返回结果
@@ -432,7 +436,7 @@ class StarCitizenPlugin(Star):
         text = "✅ 当前属性已更新：\n"
         for item in ATTR_LIST:
             text += f"{item['name']}：{current[item['key']]}\n"
-        await event.reply(text)
+        await self.context.send(event, text)
 
     @filter.command("目标属性")
     async def 目标属性(self, event: AstrMessageEvent):
@@ -457,7 +461,7 @@ class StarCitizenPlugin(Star):
             text = "📊 目标属性设置：\n"
             for item in ATTR_LIST:
                 text += f"{item['name']}：{target[item['key']]}\n"
-            await event.reply(text)
+            await self.context.send(event, text)
             return
         
         # 设置属性
@@ -484,7 +488,7 @@ class StarCitizenPlugin(Star):
                 USER_DATA[user_id]["target_attr"][attr_key] = value
         except Exception as e:
             logger.error(f"解析目标属性失败：{e}")
-            await event.reply("❌ 格式错误！正确格式：/目标属性 [属性名+数值]，例：/目标属性 生命50 攻击40 维修30")
+            await self.context.send(event, "❌ 格式错误！正确格式：/目标属性 [属性名+数值]，例：/目标属性 生命50 攻击40 维修30")
             return
         
         # 返回结果
@@ -492,7 +496,7 @@ class StarCitizenPlugin(Star):
         text = "✅ 目标属性已更新：\n"
         for item in ATTR_LIST:
             text += f"{item['name']}：{target[item['key']]}\n"
-        await event.reply(text)
+        await self.context.send(event, text)
 
     @filter.command("生成吃药方案")
     async def 生成吃药方案(self, event: AstrMessageEvent):
@@ -503,14 +507,14 @@ class StarCitizenPlugin(Star):
         
         # 检查用户数据
         if user_id not in USER_DATA:
-            await event.reply("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
+            await self.context.send(event, "❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
             return
         
         # 解析策略（去掉指令前缀）
         params = message.replace("/生成吃药方案", "").strip()
         strategy = params if params else "基础"
         if strategy not in ["基础", "最省五药", "优先四药"]:
-            await event.reply("❌ 策略错误！可选策略：基础/最省五药/优先四药，例：/生成吃药方案 基础")
+            await self.context.send(event, "❌ 策略错误！可选策略：基础/最省五药/优先四药，例：/生成吃药方案 基础")
             return
         # 转换策略名
         strategy_map = {"基础": "base", "最省五药": "saveFive", "优先四药": "priorFour"}
@@ -523,13 +527,13 @@ class StarCitizenPlugin(Star):
             if len(result) > 3000:
                 lines = result.split("\n")
                 mid = len(lines) // 2
-                await event.reply("\n".join(lines[:mid]))
-                await event.reply("\n".join(lines[mid:]))
+                await self.context.send(event, "\n".join(lines[:mid]))
+                await self.context.send(event, "\n".join(lines[mid:]))
             else:
-                await event.reply(result)
+                await self.context.send(event, result)
         except Exception as e:
             logger.error(f"生成吃药方案失败：{e}")
-            await event.reply(f"❌ 生成方案失败：{str(e)}")
+            await self.context.send(event, f"❌ 生成方案失败：{str(e)}")
 
     @filter.command("生成训练方案")
     async def 生成训练方案(self, event: AstrMessageEvent):
@@ -539,7 +543,7 @@ class StarCitizenPlugin(Star):
         
         # 检查用户数据
         if user_id not in USER_DATA:
-            await event.reply("❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
+            await self.context.send(event, "❌ 请先设置训练上限、当前属性和目标属性！发送 /超时空星舰菜单 查看使用说明")
             return
         
         # 生成方案
@@ -549,13 +553,13 @@ class StarCitizenPlugin(Star):
             if len(result) > 3000:
                 lines = result.split("\n")
                 mid = len(lines) // 2
-                await event.reply("\n".join(lines[:mid]))
-                await event.reply("\n".join(lines[mid:]))
+                await self.context.send(event, "\n".join(lines[:mid]))
+                await self.context.send(event, "\n".join(lines[mid:]))
             else:
-                await event.reply(result)
+                await self.context.send(event, result)
         except Exception as e:
             logger.error(f"生成训练方案失败：{e}")
-            await event.reply(f"❌ 生成方案失败：{str(e)}")
+            await self.context.send(event, f"❌ 生成方案失败：{str(e)}")
 
     @filter.command("属性规划")
     async def 属性规划(self, event: AstrMessageEvent):
@@ -568,7 +572,7 @@ class StarCitizenPlugin(Star):
         parts = params.split(" ")
         parts = [p for p in parts if p]  # 过滤空字符串
         if len(parts) < 5:
-            await event.reply("❌ 格式错误！正确格式：/属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]\n例：/属性规划 生命 基础10 装备15 装备23 目标100")
+            await self.context.send(event, "❌ 格式错误！正确格式：/属性规划 [属性名] 基础[数值] 装备1[数值] 装备2[数值] 目标[数值]\n例：/属性规划 生命 基础10 装备15 装备23 目标100")
             return
         
         try:
@@ -579,9 +583,9 @@ class StarCitizenPlugin(Star):
             target = float(parts[4].replace("目标", ""))
         except Exception as e:
             logger.error(f"解析属性规划参数失败：{e}")
-            await event.reply("❌ 格式错误！请检查参数格式，例：/属性规划 生命 基础10 装备15 装备23 目标100")
+            await self.context.send(event, "❌ 格式错误！请检查参数格式，例：/属性规划 生命 基础10 装备15 装备23 目标100")
             return
         
         # 计算结果
         result = calc_attr_plan(attr_name, base, equip1, equip2, target)
-        await event.reply(result)
+        await self.context.send(event, result)
