@@ -390,7 +390,7 @@ class StarCitizenAttrPlugin(Star):
 
         return result, summary
 
-    # ===================== 菜单指令（新增小提示） =====================
+    # ===================== 菜单指令（修改上限示例值） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         logger.info("收到 /超时空星舰菜单 指令！")
@@ -409,8 +409,18 @@ class StarCitizenAttrPlugin(Star):
 base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
 ------------------------
 💡 小提示：
-- 策略可选：base/priorFour/saveFive
-- 属性包括：生命/攻击/维修/能力/武器/引擎/科技/导航/耐力
+▸ 策略详解
+  ▶ base：基础均衡方案，按常规顺序使用药品/训练
+  ▶ priorFour：优先使用四级药，减少低级药消耗
+  ▶ saveFive：最小化五级药使用，优先补满单属性
+▸ 输入格式规范
+  ▶ 属性格式：【属性名】当前【数值】目标【数值】（例：生命当前0目标10）
+  ▶ 上限格式：上限【数值】（默认110，可自定义如：上限100）
+  ▶ 策略格式：策略【英文标识】（例：策略saveFive）
+▸ 关键说明
+  ▶ 可配置属性：生命/攻击/维修/能力/武器/引擎/科技/导航/耐力
+  ▶ 五级药触发：仅常规药品/训练无法加点时自动使用
+  ▶ 输入容错：支持中英文标点、空格分隔，解析自动兼容
 """
         yield event.plain_result(menu_content)
 
