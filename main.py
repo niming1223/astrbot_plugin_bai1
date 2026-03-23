@@ -1,10 +1,11 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageGradient
 import os
 import sys
 import re
+import math
 
 # ===================== 训练/吃药计算器核心配置 =====================
 # 疲劳值配置
@@ -84,6 +85,56 @@ TABLE_DATA = [
 # 尾部固定文案（仅方案使用）
 FOOTER_TEXT = "天啟舰队欢迎你，群号951239404"
 
+# ===================== 图片样式配置（可自定义） =====================
+# 菜单图片尺寸
+MENU_IMG_WIDTH = 800
+MENU_IMG_HEIGHT = 900
+
+# 颜色配置（RGB）
+COLORS = {
+    "bg_start": (20, 30, 60),    # 背景渐变起始色（深蓝）
+    "bg_end": (40, 60, 120),      # 背景渐变结束色（浅蓝）
+    "title": (255, 255, 255),     # 标题文字色（白色）
+    "subtitle": (255, 200, 100),  # 子标题文字色（浅橙）
+    "content": (220, 230, 250),   # 内容文字色（浅蓝白）
+    "highlight": (100, 200, 255), # 高亮文字色（浅蓝）
+    "line": (80, 100, 180)        # 分割线颜色
+}
+
+# 字体大小配置
+FONT_SIZES = {
+    "title": 32,
+    "subtitle": 24,
+    "content": 18,
+    "small": 16
+}
+
+# ===================== 核心工具函数 =====================
+def draw_gradient_background(draw, width, height, start_color, end_color):
+    """绘制渐变背景"""
+    for y in range(height):
+        # 计算渐变比例
+        ratio = y / height
+        r = int(start_color[0] * (1 - ratio) + end_color[0] * ratio)
+        g = int(start_color[1] * (1 - ratio) + end_color[1] * ratio)
+        b = int(start_color[2] * (1 - ratio) + end_color[2] * ratio)
+        draw.line([(0, y), (width, y)], fill=(r, g, b))
+
+def get_font(size):
+    """获取系统字体（兼容Windows）"""
+    font_paths = [
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "simhei.ttf"),
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "msyh.ttc"),
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "simsun.ttc"),
+    ]
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                return ImageFont.truetype(font_path, size)
+            except:
+                continue
+    return ImageFont.load_default(size=size)
+
 # ===================== 核心计算函数 =====================
 def calc_rate(max_limit: int, total_train: int, attr_value: int, fatigue_val: float, factor: float) -> float:
     numerator = (max_limit - total_train) * (max_limit - attr_value) * fatigue_val * factor * 100
@@ -135,6 +186,115 @@ class StarCitizenAttrPlugin(Star):
         
         logger.info(f"📝 最终解析到的参数字符串: {msg}")
         return msg
+
+    # ===================== 生成美观的菜单图片 =====================
+    def generate_menu_image(self):
+        """生成带渐变背景的美观菜单图片"""
+        # 创建图片和绘图对象
+        img = Image.new('RGB', (MENU_IMG_WIDTH, MENU_IMG_HEIGHT), color=COLORS["bg_start"])
+        draw = ImageDraw.Draw(img)
+        
+        # 绘制渐变背景
+        draw_gradient_background(draw, MENU_IMG_WIDTH, MENU_IMG_HEIGHT, 
+                               COLORS["bg_start"], COLORS["bg_end"])
+        
+        # 加载字体
+        font_title = get_font(FONT_SIZES["title"])
+        font_subtitle = get_font(FONT_SIZES["subtitle"])
+        font_content = get_font(FONT_SIZES["content"])
+        font_small = get_font(FONT_SIZES["small"])
+        
+        # 排版位置初始化
+        y = 40
+        
+        # 1. 标题
+        title_text = "📋 超时空星舰 功能菜单"
+        title_bbox = draw.textbbox((0, 0), title_text, font=font_title)
+        title_width = title_bbox[2] - title_bbox[0]
+        draw.text(((MENU_IMG_WIDTH - title_width) // 2, y), title_text, 
+                 fill=COLORS["title"], font=font_title)
+        y += 60
+        
+        # 绘制分割线
+        draw.line([(50, y), (MENU_IMG_WIDTH - 50, y)], fill=COLORS["line"], width=2)
+        y += 30
+        
+        # 2. 功能列表
+        subtitle1 = "🔧 核心功能"
+        draw.text((60, y), subtitle1, fill=COLORS["subtitle"], font=font_subtitle)
+        y += 40
+        
+        functions = [
+            "/超时空星舰菜单   - 显示此菜单",
+            "/装备属性 - 查看橙装/金装属性对比（图片版）",
+            "/生成吃药方案 - 生成吃药加点方案",
+            "/生成训练方案 - 生成训练加点方案"
+        ]
+        for func in functions:
+            draw.text((80, y), func, fill=COLORS["content"], font=font_content)
+            y += 35
+        
+        # 绘制分割线
+        draw.line([(50, y + 10), (MENU_IMG_WIDTH - 50, y + 10)], fill=COLORS["line"], width=1)
+        y += 40
+        
+        # 3. 指令示例
+        subtitle2 = "📌 指令示例"
+        draw.text((60, y), subtitle2, fill=COLORS["subtitle"], font=font_subtitle)
+        y += 40
+        
+        examples = [
+            "/生成吃药方案 上限110 生命当前0目标10 攻击当前0目标5 策略base",
+            "/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5"
+        ]
+        for idx, example in enumerate(examples):
+            draw.text((80, y), example, fill=COLORS["content"], font=font_small if idx == 0 else font_small)
+            y += 35
+        
+        # 绘制分割线
+        draw.line([(50, y + 10), (MENU_IMG_WIDTH - 50, y + 10)], fill=COLORS["line"], width=1)
+        y += 40
+        
+        # 4. 策略说明
+        subtitle3 = "🎯 策略说明"
+        draw.text((60, y), subtitle3, fill=COLORS["subtitle"], font=font_subtitle)
+        y += 40
+        
+        strategy_text = "base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药"
+        draw.text((80, y), strategy_text, fill=COLORS["highlight"], font=font_content)
+        y += 40
+        
+        # 绘制分割线
+        draw.line([(50, y + 10), (MENU_IMG_WIDTH - 50, y + 10)], fill=COLORS["line"], width=1)
+        y += 40
+        
+        # 5. 小提示
+        subtitle4 = "💡 小提示"
+        draw.text((60, y), subtitle4, fill=COLORS["subtitle"], font=font_subtitle)
+        y += 40
+        
+        tips = [
+            "输入格式：属性名当前数值目标数值（例：生命当前0目标10）、上限数值（默认110，可自定义如：上限100）、策略英文标识（例：策略saveFive）",
+            "",
+            "关键说明：",
+            "  ▶ 可配置属性：生命/攻击/维修/能力/武器/引擎/科技/导航/耐力",
+            "  ▶ 五级药触发：仅常规药品/训练无法加点时自动使用"
+        ]
+        
+        for tip in tips:
+            if tip:
+                draw.text((80, y), tip, fill=COLORS["content"], font=font_small)
+            y += 30
+        
+        # 保存图片
+        img_path = os.path.join(self.plugin_dir, "starship_menu.png")
+        if os.path.exists(img_path):
+            try:
+                os.remove(img_path)
+            except:
+                pass
+        img.save(img_path, "PNG", quality=95)
+        return img_path
 
     # ===================== 字体/图片生成（装备属性用） =====================
     def get_windows_font(self):
@@ -390,11 +550,19 @@ class StarCitizenAttrPlugin(Star):
 
         return result, summary
 
-    # ===================== 菜单指令（精简小提示） =====================
+    # ===================== 菜单指令（图片输出版） =====================
     @filter.command("超时空星舰菜单")
     async def 超时空星舰菜单(self, event: AstrMessageEvent):
         logger.info("收到 /超时空星舰菜单 指令！")
-        menu_content = """📋 超时空星舰 功能菜单
+        try:
+            # 生成菜单图片
+            menu_img_path = self.generate_menu_image()
+            # 返回图片结果
+            yield event.image_result(menu_img_path)
+        except Exception as e:
+            logger.error(f"生成菜单图片失败: {str(e)}", exc_info=True)
+            # 降级返回文本菜单（备用）
+            fallback_menu = """📋 超时空星舰 功能菜单
 ------------------------
 /超时空星舰菜单   - 显示此菜单
 /装备属性 - 查看橙装/金装属性对比（图片版）
@@ -413,9 +581,8 @@ base - 基础方案 | priorFour - 优先四级药 | saveFive - 最省五药
 ▸ 关键说明
   ▶ 可配置属性：生命/攻击/维修/能力/武器/引擎/科技/导航/耐力
   ▶ 五级药触发：仅常规药品/训练无法加点时自动使用
-  ▶ 输入容错：支持中英文标点、空格分隔，解析自动兼容
 """
-        yield event.plain_result(menu_content)
+            yield event.plain_result(fallback_menu)
 
     # ===================== 装备属性指令 =====================
     @filter.command("装备属性")
