@@ -1,7 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from PIL import Image, ImageDraw, ImageFont, ImageGradient
+from PIL import Image, ImageDraw, ImageFont  # 移除了错误的 ImageGradient 导入
 import os
 import sys
 import re
@@ -111,13 +111,15 @@ FONT_SIZES = {
 
 # ===================== 核心工具函数 =====================
 def draw_gradient_background(draw, width, height, start_color, end_color):
-    """绘制渐变背景"""
+    """手动绘制渐变背景（无需ImageGradient）"""
     for y in range(height):
-        # 计算渐变比例
+        # 计算渐变比例（从上到下）
         ratio = y / height
+        # 计算当前行的RGB值（线性过渡）
         r = int(start_color[0] * (1 - ratio) + end_color[0] * ratio)
         g = int(start_color[1] * (1 - ratio) + end_color[1] * ratio)
         b = int(start_color[2] * (1 - ratio) + end_color[2] * ratio)
+        # 绘制当前行的像素线
         draw.line([(0, y), (width, y)], fill=(r, g, b))
 
 def get_font(size):
@@ -194,7 +196,7 @@ class StarCitizenAttrPlugin(Star):
         img = Image.new('RGB', (MENU_IMG_WIDTH, MENU_IMG_HEIGHT), color=COLORS["bg_start"])
         draw = ImageDraw.Draw(img)
         
-        # 绘制渐变背景
+        # 绘制渐变背景（手动实现，无依赖）
         draw_gradient_background(draw, MENU_IMG_WIDTH, MENU_IMG_HEIGHT, 
                                COLORS["bg_start"], COLORS["bg_end"])
         
@@ -248,7 +250,7 @@ class StarCitizenAttrPlugin(Star):
             "/生成训练方案 上限110 生命当前0目标10 攻击当前0目标5"
         ]
         for idx, example in enumerate(examples):
-            draw.text((80, y), example, fill=COLORS["content"], font=font_small if idx == 0 else font_small)
+            draw.text((80, y), example, fill=COLORS["content"], font=font_small)
             y += 35
         
         # 绘制分割线
